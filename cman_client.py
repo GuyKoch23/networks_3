@@ -38,6 +38,8 @@ class GameClient:
         try:
             data, _ = self.socket.recvfrom(1024)
             return message_util.decode_message(data)
+        except socket.timeout:
+            raise socket.timeout
         except Exception as e:
             print(f"Error receiving message: {e}")
             self.cleanup()

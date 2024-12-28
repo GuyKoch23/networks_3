@@ -190,6 +190,11 @@ class GameServer:
 
         data = self.build_join_response(message, message_type, role)
         self.send_message(client_addr, data)
+        if self.game.state == game.State.START and requested_role == ClientRole.SPIRIT:
+            cman_data = self.build_update_state_message(ClientRole.CMAN)
+            self.send_message(self.role_assignments[ClientRole.CMAN], cman_data)
+
+
     
     def build_end_game_message(self):
         winner = self.game.get_winner() + 1 # +1 for mapping ClientRole to Player enum according to pdf reqs
@@ -203,7 +208,7 @@ class GameServer:
         if role == ClientRole.WATCHER:
             freeze = 1
         else:
-            freeze = self.game.can_move(role-1) # -1 for mapping ClientRole to Player enum
+            freeze = not self.game.can_move(role-1) # -1 for mapping ClientRole to Player enum
         coords_c = self.game.get_current_players_coords()[0]
         coords_s = self.game.get_current_players_coords()[1]
         attempts = 3 - self.game.lives

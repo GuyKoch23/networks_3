@@ -9,39 +9,21 @@ OPCODE_ERROR = 0xFF  # Server->Client
 
 
 def create_join_message(role):
-    if not (0 <= role <= 2):
-        raise ValueError("Role must be 0 (Observer), 1 (Cman), or 2 (Spirit).")
-    
     return struct.pack('!BB', OPCODE_JOIN_REQUEST, role)
 
 def create_player_movement_message(direction):
-    if not (0 <= direction <= 3):
-        raise ValueError("Direction must be 0 (Up), 1 (Left), 2 (Down), or 3 (Right).")
-    
     return struct.pack('!BB', OPCODE_PLAYER_MOVEMENT, direction)
 
 def create_quit_message():
     return struct.pack('!B', OPCODE_QUIT)
 
 def create_game_state_update_message(freeze, coords_c, coords_s, attempts, collected):
-    if not (0 <= freeze <= 1):
-        raise ValueError("Freeze must be 0 or 1.")
-    # if not (0 <= collected < (1 << 40)):  # Ensure collected fits 40 bits
-    #     raise ValueError("Collected must be a 40-bit integer.") # TODO
-    
-    #collected_bytes = collected.to_bytes(5, byteorder='big')
     return struct.pack('!BBBBBBB', OPCODE_GAME_STATE_UPDATE, freeze, coords_c[0], coords_c[1], coords_s[0], coords_s[1], attempts) + collected
 
 def create_game_end_message(winner, score_s, score_c):
-    if not (1 <= winner <= 2):
-        raise ValueError("Winner must be 1 (Cman) or 2 (Spirit).")
-    
     return struct.pack('!BBBB', OPCODE_GAME_END, winner, score_s, score_c)
 
 def create_error_message(error_data):
-    if len(error_data) != 11:
-        raise ValueError("Error data must be exactly 11 bytes.")
-    
     return struct.pack('!B', OPCODE_ERROR) + error_data
 
 
@@ -98,15 +80,12 @@ def decode_quit_message(data):
     return OPCODE_QUIT
 
 def decode_game_state_update_message(data):
-    if len(data) < 14:
-        raise ValueError("Game state update message must be at least 14 bytes.")
-    
-    opcode, freeze, coords_c_x, coords_c_y, coords_s_x, coords_s_y, attempts = struct.unpack('!BBHHHHB', data[:9])
+    opcode, freeze, coords_c_x, coords_c_y, coords_s_x, coords_s_y, attempts = struct.unpack('!BBBBBBB', data[:7])
     if opcode != OPCODE_GAME_STATE_UPDATE:
         raise ValueError("Invalid opcode for game state update message.")
     
     # Extract the last 5 bytes for the collected value (40 bits)
-    collected_bytes = data[9:14]
+    collected_bytes = data[7:12]
     collected = int.from_bytes(collected_bytes, byteorder='big')
     
     return OPCODE_GAME_STATE_UPDATE, freeze, (coords_c_x, coords_c_y), (coords_s_x, coords_s_y), attempts, collected

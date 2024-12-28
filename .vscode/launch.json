@@ -2,12 +2,30 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Client",
+            "name": "Cman",
             "type": "debugpy",
             "request": "launch",
             "program": "cman_client.py",
             "console": "integratedTerminal",
             "args": ["cman", "127.0.0.1", "-p", "4567"],
+            "justMyCode": false
+        },
+        {
+            "name": "Spirit",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "cman_client.py",
+            "console": "integratedTerminal",
+            "args": ["spirit", "127.0.0.1", "-p", "4567"],
+            "justMyCode": false
+        },
+        {
+            "name": "Watcher",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "cman_client.py",
+            "console": "integratedTerminal",
+            "args": ["watcher", "127.0.0.1", "-p", "4567"],
             "justMyCode": false
         },
         {
