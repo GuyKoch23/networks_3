@@ -6,12 +6,6 @@ OPCODE_QUIT = 0x0F  # Client->Server
 OPCODE_GAME_STATE_UPDATE = 0x80  # Server->Client
 OPCODE_GAME_END = 0x8F  # Server->Client
 OPCODE_ERROR = 0xFF  # Server->Client
-MOVE = 'move'
-JOIN = 'join'
-QUIT = 'quit'
-ERROR = 'error'
-UPDATE = 'update'
-GAMEEND = 'gameend'
 
 
 def create_join_message(role):
@@ -32,11 +26,11 @@ def create_quit_message():
 def create_game_state_update_message(freeze, coords_c, coords_s, attempts, collected):
     if not (0 <= freeze <= 1):
         raise ValueError("Freeze must be 0 or 1.")
-    if not (0 <= collected < (1 << 40)):  # Ensure collected fits 40 bits
-        raise ValueError("Collected must be a 40-bit integer.")
+    # if not (0 <= collected < (1 << 40)):  # Ensure collected fits 40 bits
+    #     raise ValueError("Collected must be a 40-bit integer.") # TODO
     
-    collected_bytes = collected.to_bytes(5, byteorder='big')
-    return struct.pack('!BBHHHB', OPCODE_GAME_STATE_UPDATE, freeze, coords_c[0], coords_c[1], coords_s[0], coords_s[1], attempts) + collected_bytes
+    #collected_bytes = collected.to_bytes(5, byteorder='big')
+    return struct.pack('!BBBBBBB', OPCODE_GAME_STATE_UPDATE, freeze, coords_c[0], coords_c[1], coords_s[0], coords_s[1], attempts) + collected
 
 def create_game_end_message(winner, score_s, score_c):
     if not (1 <= winner <= 2):
@@ -81,7 +75,7 @@ def decode_join_message(data):
     if opcode != OPCODE_JOIN_REQUEST:
         raise ValueError("Invalid opcode for join message.")
     
-    return JOIN, role
+    return OPCODE_JOIN_REQUEST, role
 
 def decode_player_movement_message(data):
     if len(data) != 2:
@@ -91,7 +85,7 @@ def decode_player_movement_message(data):
     if opcode != OPCODE_PLAYER_MOVEMENT:
         raise ValueError("Invalid opcode for player movement message.")
     
-    return MOVE, direction
+    return OPCODE_PLAYER_MOVEMENT, direction
 
 def decode_quit_message(data):
     if len(data) != 1:
@@ -101,13 +95,13 @@ def decode_quit_message(data):
     if opcode != OPCODE_QUIT:
         raise ValueError("Invalid opcode for quit message.")
     
-    return QUIT
+    return OPCODE_QUIT
 
 def decode_game_state_update_message(data):
     if len(data) < 14:
         raise ValueError("Game state update message must be at least 14 bytes.")
     
-    opcode, freeze, coords_c_x, coords_c_y, coords_s_x, coords_s_y, attempts = struct.unpack('!BBHHHB', data[:9])
+    opcode, freeze, coords_c_x, coords_c_y, coords_s_x, coords_s_y, attempts = struct.unpack('!BBHHHHB', data[:9])
     if opcode != OPCODE_GAME_STATE_UPDATE:
         raise ValueError("Invalid opcode for game state update message.")
     
@@ -115,7 +109,7 @@ def decode_game_state_update_message(data):
     collected_bytes = data[9:14]
     collected = int.from_bytes(collected_bytes, byteorder='big')
     
-    return freeze, (coords_c_x, coords_c_y), (coords_s_x, coords_s_y), attempts, collected
+    return OPCODE_GAME_STATE_UPDATE, freeze, (coords_c_x, coords_c_y), (coords_s_x, coords_s_y), attempts, collected
 
 def decode_game_end_message(data):
     if len(data) != 4:
@@ -125,7 +119,7 @@ def decode_game_end_message(data):
     if opcode != OPCODE_GAME_END:
         raise ValueError("Invalid opcode for game end message.")
     
-    return winner, score_s, score_c
+    return OPCODE_GAME_END, winner, score_s, score_c
 
 def decode_error_message(data):
     if len(data) != 12:
@@ -137,4 +131,4 @@ def decode_error_message(data):
     
     error_data = data[1:]
     
-    return error_data
+    return OPCODE_ERROR, error_data

@@ -38,7 +38,7 @@ def read_map(path):
 
         return map_data
     
-def print_map(path):
+def print_map(path, state_data=None):
     visual_mapping = {
         FREE_CHAR: ' ',  # Free space
         WALL_CHAR: '█',  # Wall
@@ -66,5 +66,3 @@ def print_map(path):
         print("Error: The file does not exist.")
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
-
-print_map("map.txt")

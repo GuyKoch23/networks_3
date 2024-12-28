@@ -1,0 +1,23 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Client",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "cman_client.py",
+            "console": "integratedTerminal",
+            "args": ["cman", "127.0.0.1", "-p", "4567"],
+            "justMyCode": false
+        },
+        {
+            "name": "Server",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "cman_server.py",
+            "console": "integratedTerminal",
+            "args": ["-p", "4567"],
+            "justMyCode": false
+        }
+    ]
+}

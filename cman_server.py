@@ -104,7 +104,7 @@ class GameServer:
 
     def handle_disconnect(self, client_addr):
         if client_addr not in self.clients:
-            data = self.build_disconnect_response("Client is not player", message_util.ERROR)
+            data = self.build_disconnect_response("Client is not player", message_util.OPCODE_ERROR)
             self.send_message(client_addr, data)
             return
             
@@ -128,13 +128,13 @@ class GameServer:
 
     def handle_move(self, client_addr, direction):
         if not client_addr in self.clients.keys():
-            data = self.build_move_response("Client is not a player", message_util.ERROR, None)
+            data = self.build_move_response("Client is not a player", message_util.OPCODE_ERROR, None)
 
         if not client_addr in self.role_assignments.values():
-            data = self.build_move_response("Client is a watcher and cannot move", message_util.ERROR, None)
+            data = self.build_move_response("Client is a watcher and cannot move", message_util.OPCODE_ERROR, None)
         
         if not self.game_active:
-            data = self.build_move_response("Game is not active", message_util.ERROR, None)
+            data = self.build_move_response("Game is not active", message_util.OPCODE_ERROR, None)
             
         client_role = self.clients[client_addr]
 
@@ -147,37 +147,38 @@ class GameServer:
             if self.game.state == game.State.WIN:
                 self.handle_game_end()
         else:
-            data = self.build_move_response("Move didnt apply", message_util.ERROR, None)
+            data = self.build_move_response("Move didnt apply", message_util.OPCODE_ERROR, None)
         
         self.send_message(client_addr, data)
 
 
     def build_move_response(self, message, message_type, role):
-        if message_type == message_util.ERROR:
+        if message_type == message_util.OPCODE_ERROR:
             data = message_util.create_error_message(message)
         return data
 
     def handle_join_request(self, client_addr, role):
-        if not role in ClientRole.__members__:
+        if not role in [ClientRole.CMAN, ClientRole.SPIRIT, ClientRole.WATCHER]:
             message = "role does not exist"
-            message_type = message_util.ERROR
+            message_type = message_util.OPCODE_ERROR
             data = self.build_join_response(message, message_type, role)
-            return data
+            self.send_message(client_addr, data)
+            return
  
         requested_role = ClientRole(role)
         
         if requested_role in [ClientRole.CMAN, ClientRole.SPIRIT]:
             if self.game_active:
                 message = "game has already started"
-                message_type = message_util.ERROR
+                message_type = message_util.OPCODE_ERROR
             elif self.role_assignments[requested_role] is not None:
                 message = "role is taken"
-                message_type = message_util.ERROR
+                message_type = message_util.OPCODE_ERROR
             else:
                 self.role_assignments[requested_role] = client_addr
                 self.clients[client_addr] = requested_role
                 message = "join accepted!"
-                message_type = message_util.UPDATE
+                message_type = message_util.OPCODE_GAME_STATE_UPDATE
 
                 if all(assignment is not None for assignment in self.role_assignments.values()):
                     self.game_active = True
@@ -185,7 +186,7 @@ class GameServer:
         else:
             self.clients[client_addr] = requested_role
             message = "join accepted!"
-            message_type = message_util.UPDATE
+            message_type = message_util.OPCODE_GAME_STATE_UPDATE
 
         data = self.build_join_response(message, message_type, role)
         self.send_message(client_addr, data)
@@ -206,19 +207,24 @@ class GameServer:
         coords_c = self.game.get_current_players_coords()[0]
         coords_s = self.game.get_current_players_coords()[1]
         attempts = 3 - self.game.lives
-        collected = self.game.get_points().values()
-        return message_util.create_game_state_update_message(freeze, coords_c, coords_s, attempts, collected)
+        
+        collected = [str(1-item) for item in self.game.get_points().values()]
+        binary_string = ''.join(collected)
+        integer_representation = int(binary_string, 2)
+        collected_binary = integer_representation.to_bytes(5, byteorder='big')
+
+        return message_util.create_game_state_update_message(freeze, coords_c, coords_s, attempts, collected_binary)
 
     def build_join_response(self, message, message_type, role):
-        if message_type == message_util.ERROR:
+        if message_type == message_util.OPCODE_ERROR:
             data = message_util.create_error_message(message)
-        elif message_type == message_util.UPDATE:
+        elif message_type == message_util.OPCODE_GAME_STATE_UPDATE:
             data = self.build_update_state_message(role)
         
         return data
 
     def send_message(self, client_address, data):
-        self.socket_udp.sendto(data.encode(), client_address)
+        self.socket_udp.sendto(data, client_address)
 
 
     def run(self):        
@@ -227,11 +233,11 @@ class GameServer:
                 data, addr = self.socket_udp.recvfrom(1024)
                 message = message_util.decode_message(data)
                                 
-                if message[0] == message_util.JOIN:
+                if message[0] == message_util.OPCODE_JOIN_REQUEST:
                     self.handle_join_request(addr, message[1])
-                elif message[0] == message_util.MOVE:
+                elif message[0] == message_util.OPCODE_PLAYER_MOVEMENT:
                     self.handle_move(addr, message[1])
-                elif message[0] == message_util.QUIT:
+                elif message[0] == message_util.OPCODE_QUIT:
                     self.handle_disconnect(addr)
                                 
             except Exception as e:
@@ -239,7 +245,7 @@ class GameServer:
 
 def main():
     parser = argparse.ArgumentParser(description="My great parser")
-    parser.add_argument('-p', type=int, default=1337, help='Port number to use (default: 1337)')
+    parser.add_argument('-p', '--port', type=int, default=1337, help='Port number to use (default: 1337)')
     args = parser.parse_args()
 
     host = '127.0.0.1'
