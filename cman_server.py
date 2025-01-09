@@ -5,6 +5,7 @@ from enum import IntEnum
 import json
 import time
 import message_util
+import select
 
 # def reset_game():
 #     pass
@@ -103,6 +104,7 @@ class GameServer:
             self.send_message(client_addr, data)
 
     def handle_disconnect(self, client_addr):
+
         if client_addr not in self.clients:
             data = self.build_disconnect_response("Client is not player", message_util.OPCODE_ERROR)
             self.send_message(client_addr, data)
@@ -118,13 +120,26 @@ class GameServer:
                 self.game.declare_winner(winner)
                 self.handle_game_end()
         return
+    
+
+    # def handle_broken_socket(self, client_addr):
+    #     if client_addr in self.clients:
+    #         role = self.clients[client_addr]
+    #         del self.clients[client_addr]
+        
+    #         if role in [ClientRole.CMAN, ClientRole.SPIRIT]:
+    #             self.role_assignments[role] = None
+    #             if self.game_active:
+    #                 winner = game.Player.SPIRIT if role == ClientRole.CMAN else game.Player.CMAN
+    #                 self.game.declare_winner(winner)
+    #                 self.handle_game_end()
+    #         return
+    #     return
 
 
     def build_disconnect_response(self, message, message_type):
         data = message_util.create_error_message(message)
         return data
-
-
 
     def handle_move(self, client_addr, direction):
         if not client_addr in self.clients.keys():
@@ -140,16 +155,16 @@ class GameServer:
 
         player = game.Player.CMAN if client_role == ClientRole.CMAN else game.Player.SPIRIT
         
-        direction = game.Direction(data.get('direction'))
+        direction = game.Direction(direction)
 
         if self.game.apply_move(player, direction):
             self.broadcast_state()
             if self.game.state == game.State.WIN:
                 self.handle_game_end()
+            return
         else:
-            data = self.build_move_response("Move didnt apply", message_util.OPCODE_ERROR, None)
-        
-        self.send_message(client_addr, data)
+            data = self.build_update_state_message(client_role)
+            self.send_message(client_addr, data)
 
 
     def build_move_response(self, message, message_type, role):
@@ -223,7 +238,7 @@ class GameServer:
     def build_join_response(self, message, message_type, role):
         if message_type == message_util.OPCODE_ERROR:
             data = message_util.create_error_message(message)
-        elif message_type == message_util.OPCODE_GAME_STATE_UPDATE:
+        else : #message_type == message_util.OPCODE_GAME_STATE_UPDATE:
             data = self.build_update_state_message(role)
         
         return data
@@ -234,19 +249,27 @@ class GameServer:
 
     def run(self):        
         while True:
-            try:
-                data, addr = self.socket_udp.recvfrom(1024)
-                message = message_util.decode_message(data)
-                                
-                if message[0] == message_util.OPCODE_JOIN_REQUEST:
-                    self.handle_join_request(addr, message[1])
-                elif message[0] == message_util.OPCODE_PLAYER_MOVEMENT:
-                    self.handle_move(addr, message[1])
-                elif message[0] == message_util.OPCODE_QUIT:
-                    self.handle_disconnect(addr)
-                                
-            except Exception as e:
-                print(f"Error: {e}")
+            readable, _, _ = select.select([self.socket_udp], [], [], 0.1)
+
+            if readable:
+                try: 
+                    data, addr = self.socket_udp.recvfrom(1024)
+                    message = message_util.decode_message(data)
+                                    
+                    if message[0] == message_util.OPCODE_JOIN_REQUEST:
+                        self.handle_join_request(addr, message[1])
+                    elif message[0] == message_util.OPCODE_PLAYER_MOVEMENT:
+                        self.handle_move(addr, message[1])
+                    elif message[0] == message_util.OPCODE_QUIT:
+                        self.handle_disconnect(addr)
+                # except socket.error:
+                #     if len(self.clients.keys()) > 0:
+                #         self.handle_broken_socket(addr)
+                except Exception as e:
+                    print(f"Error: {e}")
+
+            time.sleep(0.1)
+
 
 def main():
     parser = argparse.ArgumentParser(description="My great parser")

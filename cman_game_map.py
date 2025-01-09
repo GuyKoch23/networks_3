@@ -38,6 +38,10 @@ def read_map(path):
 
         return map_data
     
+def replace_char_at_index(s, index, char):
+    return s[:index] + char + s[index + 1:]
+    
+    
 def print_map(path, state_data=None):
     visual_mapping = {
         FREE_CHAR: ' ',  # Free space
@@ -49,8 +53,25 @@ def print_map(path, state_data=None):
     
     try:
         map_data = read_map(path)
+        map_data = map_data.replace(CMAN_CHAR, FREE_CHAR)
+        map_data = map_data.replace(SPIRIT_CHAR, FREE_CHAR)
+
+        binary_string = bin(state_data[4])[2:].zfill(40)
+        binary_string = [int(bit) for bit in binary_string]
+
+        k = 0
+        for i, c in enumerate(map_data):
+            if c == POINT_CHAR:
+                if binary_string[k] == 1:
+                    map_data = replace_char_at_index(map_data, i, FREE_CHAR)
+                k += 1
+
+
         map_lines = map_data.split('\n')
-        
+        map_lines[state_data[1][0]] = replace_char_at_index(map_lines[state_data[1][0]], state_data[1][1], CMAN_CHAR )
+        map_lines[state_data[2][0]] = replace_char_at_index(map_lines[state_data[2][0]], state_data[2][1], SPIRIT_CHAR )
+
+
         print("Game Board:")
         print("=" * 30)
         

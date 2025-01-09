@@ -4,6 +4,8 @@ import message_util
 import cman_utils
 from enum import IntEnum
 import cman_game_map
+import select
+import time
 
 class ClientRole(IntEnum):
     WATCHER = 0
@@ -47,7 +49,9 @@ class GameClient:
         
     def cleanup(self, message=""):
         if message:
-            print(message)
+            print("Exiting: " + message)
+        # msg = message_util.create_quit_message()
+        # self.send_message(msg)
         self.socket.close()
         self.running = False
 
@@ -66,7 +70,7 @@ class GameClient:
         message_type = response[0]
 
         if message_type == message_util.OPCODE_ERROR:
-            self.cleanup(response[1])
+            self.cleanup(response[1].decode('utf-8'))
             return False
 
         if message_type == message_util.OPCODE_GAME_STATE_UPDATE:
@@ -94,12 +98,14 @@ class GameClient:
 
     def handle_game_end(self, end_data):
         winner, spirit_score, cman_score = end_data
-        cman_utils.clear_print("\nGame Over!")
-        cman_utils.clear_print(f"Winner: {'Cman' if winner == ClientRole.CMAN else 'Spirit'}")
-        cman_utils.clear_print(f"Final Scores:")
-        cman_utils.clear_print(f"Cman: {cman_score} points")
-        cman_utils.clear_print(f"Spirit: {spirit_score} catches")
-        self.running = False
+        cman_utils.clear_print()
+        print("\nGame Over!")
+        print(f"Winner: {'Cman' if winner == ClientRole.CMAN else 'Spirit'}")
+        print(f"Final Scores:")
+        print(f"Cman: {cman_score} points")
+        print(f"Spirit: {spirit_score} catches")
+        if self.role != ClientRole.WATCHER:
+            self.running = False
 
     def run(self):
         if not self.join_game():
@@ -108,28 +114,38 @@ class GameClient:
 
         while self.running:
             try:
+                
                 if self.check_quit():
                     break
+
+
+                readable, sendable, _ = select.select([self.socket], [self.socket], [], 0.1)
+                if readable:
+                    try:
+                        response = self.receive_message()
+                        if response:
+                            message_type = response[0]
+                            if message_type == message_util.OPCODE_ERROR:
+                                print(f"Error: {response[1:]}")
+                                break
+                            elif message_type == message_util.OPCODE_GAME_STATE_UPDATE:
+                                self.handle_game_state(response[1:])
+                            elif message_type == message_util.OPCODE_GAME_END:
+                                self.handle_game_end(response[1:])
+                                if self.role != ClientRole.WATCHER:
+                                    break
+                    except socket.timeout:
+                        pass
+                # if sendable:
+                #     i = 1
+                #     pass
+
                 self.check_movement()
-                self.socket.settimeout(0.1)
-                try:
-                    response = self.receive_message()
-                    if response:
-                        message_type = response[0]
-                        if message_type == message_util.OPCODE_ERROR:
-                            print(f"Error: {response[1]}")
-                            break
-                        elif message_type == message_util.OPCODE_GAME_STATE_UPDATE:
-                            self.handle_game_state(response[1:])
-                        elif message_type == message_util.OPCODE_GAME_END:
-                            self.handle_game_end(response[1:])
-                            break
-                except socket.timeout:
-                    pass
+
             except Exception as e:
                 print(f"Error in game loop: {e}")
                 break
-
+            time.sleep(0.1)
         self.cleanup()
 
 def main():
