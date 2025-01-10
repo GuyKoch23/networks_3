@@ -25,7 +25,7 @@ def create_game_end_message(winner, score_s, score_c):
 
 def create_error_message(error_data):
     error_data_bytes = error_data.encode('utf-8')
-    return struct.pack(f'!B36s', OPCODE_ERROR, error_data_bytes)
+    return struct.pack(f'!B{len(error_data_bytes)}s', OPCODE_ERROR, error_data_bytes)
 
 
 def decode_message(data):

@@ -50,7 +50,6 @@ def print_map(path, state_data=None):
         CMAN_CHAR: CMAN_CHAR,  # Player C start
         SPIRIT_CHAR: SPIRIT_CHAR   # Player S start
     }
-    
     try:
         map_data = read_map(path)
         map_data = map_data.replace(CMAN_CHAR, FREE_CHAR)
